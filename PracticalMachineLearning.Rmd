@@ -1,0 +1,100 @@
+---
+title: "Practical Machine Learning Assignment"
+output: html_document
+---
+
+
+
+#Predictions on Weight Lifting Exercise using a random forest algorithm
+
+
+##Executive summary:
+Our goal is to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants to predict  the manner (i.e. correctly or incorrectly) in which they perform barbell lifts in 5 different ways.  The training and testing datasets are taken from the Human Activity Recognition data set from Groupware.  Here, we use a random forest algorithm to predict the outcome based on all the relevant predictors.  
+
+
+
+## Data Analysis
+First, we load the nescessary library and the data files (training and testing).  We also set the seed for random number generation.
+
+```{r}
+library(caret); library(randomForest);
+inTrain <- read.csv("pml-training.csv",na.strings=c("NA",""))
+inTest <- read.csv("pml-testing.csv",na.strings=c("NA",""))
+set.seed(123)
+
+```
+
+We then remove the columns that consist mainly of NAs, and we also remove unnecessary factor columns.  We then remove the exact same columns for the test data set.
+
+```{r}
+colNACounts <- colSums(is.na(inTrain)) 
+NAcol <- colNACounts >= 19000 
+sTrain <- inTrain[!NAcol]
+sTrain <- sTrain[,-c(1,2,5,6)]
+sTest <- inTest[!NAcol]
+sTest <- sTest[,-c(1,2,5,6)]
+```
+
+We can look at how many examples are including in each of the "classe" that we are trying to predict.  Figure displays an histogram for the number of examples for each classe outcomes.
+
+We then ensure that we do not have "near-zezo-variance predictors" using:
+
+```{r}
+NZVP <- nearZeroVar(sTrain[,-56], saveMetrics = TRUE)
+```
+
+The results indicate that all the remaining predictors should be included in the analysis.
+
+We then partition the training dataset into a training and testing data set.
+
+```{r}
+partition <- createDataPartition(y = sTrain$classe, p = 0.6, list = FALSE)
+trainingdata <- sTrain[partition, ]
+testdata <- sTrain[-partition, ]
+```
+
+We then train a random forest algorithm on the training dataset.  First, we tune the optimum "mtry"" parameter using a buildin function:
+
+```
+tuneRF(trainingdata[,-56], trainingdata$classe, mtryStart = 3)
+```
+The results indicate that mtry = 12 is optimal.
+The model is then obtained with
+
+```{r}
+model <- train(trainingdata[,-56],trainingdata$classe, method = "rf", tuneGrid = data.frame(mtry=12), trControl=trainControl(method="none"))
+model$finalModel
+```
+
+As can be seen on the Confusion matrix, the accuracy is high.  and the out-of-bag (oob) error is low.
+The importance of each variables is plotted on figure 2.
+Finally, to measure the out-of-sample error properly, we compare the prediction to the actual value on the testing data set.
+
+```{r}
+confusionMatrix(predict(model,newdata=testdata[-56]), testdata$classe)
+
+```
+
+The accuracy kappa values are high, indicating that the model is accurate.  And confusion matrix shows that very few of the examples were mislabelled.
+
+We then apply the trained algorithm on the testing dataset for the submission section, and 20 our of 20 of the predictions were accurate.
+
+In summary, our random forest algorithm is capable of accurately predicting the manner in which the exercise were preformed.
+
+
+
+##Figures
+
+###Figure 1
+
+```{r fig.height=5}
+plot(sTrain$classe)
+```
+FIGURE 1
+
+###Figure 2
+
+```{r fig.height=5}
+plot( varImp(model) )
+```
+FIGURE 2
